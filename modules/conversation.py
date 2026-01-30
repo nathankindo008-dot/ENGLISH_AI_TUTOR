@@ -11,27 +11,36 @@ class ConversationManager:
     def __init__(self, filename="data/conversations.json"):
         """
         Initialise le gestionnaire de conversations.
-        
-        Args:
-            filename (str): Chemin du fichier JSON pour sauvegarder
         """
         self.filename = filename
-        self.history = []
+        self.session_history = []  # Historique de la session actuelle
+        self.all_history = []      # Toutes les conversations (anciennes + nouvelles)
         
         # Créer le dossier data/ s'il n'existe pas
         os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
+        # Charger les conversations existantes
+        self._load_existing()
+    
+    def _load_existing(self):
+        """
+        Charge les conversations existantes depuis le fichier.
+        """
+        try:
+            if os.path.exists(self.filename):
+                with open(self.filename, 'r', encoding='utf-8') as f:
+                    self.all_history = json.load(f)
+                print(f"📂 Loaded {len(self.all_history)} previous conversations")
+        except Exception as e:
+            print(f"❌ Error loading conversations: {e}")
+            self.all_history = []
     
     def add_turn(self, user_text, ai_response, feedback):
         """
         Ajoute un tour de conversation.
-        
-        Args:
-            user_text (str): Ce que l'utilisateur a dit
-            ai_response (str): La réponse brute de l'IA
-            feedback (dict): Le feedback extrait (corrections, vocab, tips)
         """
         turn = {
-            "timestamp": datetime.now().isoformat(),  # Format: 2025-12-18T13:20:00
+            "timestamp": datetime.now().isoformat(),
             "user": user_text,
             "ai_full_response": ai_response,
             "ai_response": feedback["response"],
@@ -40,15 +49,29 @@ class ConversationManager:
             "grammar_tips": feedback["grammar_tips"]
         }
         
-        self.history.append(turn)
+        self.session_history.append(turn)
+        self.all_history.append(turn)
+        
+        # Auto-save après chaque tour
+        self._auto_save()
     
-    def save(self):
+    def _auto_save(self):
         """
-        Sauvegarde l'historique dans le fichier JSON.
+        Sauvegarde automatique après chaque tour.
         """
         try:
             with open(self.filename, 'w', encoding='utf-8') as f:
-                json.dump(self.history, f, indent=2, ensure_ascii=False)
+                json.dump(self.all_history, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"❌ Auto-save error: {e}")
+    
+    def save(self):
+        """
+        Sauvegarde manuelle l'historique dans le fichier JSON.
+        """
+        try:
+            with open(self.filename, 'w', encoding='utf-8') as f:
+                json.dump(self.all_history, f, indent=2, ensure_ascii=False)
             print(f"\n💾 Conversation saved to {self.filename}")
         except Exception as e:
             print(f"\n❌ Error saving conversation: {e}")
@@ -57,11 +80,16 @@ class ConversationManager:
         """
         Charge l'historique depuis le fichier JSON.
         """
-        try:
-            if os.path.exists(self.filename):
-                with open(self.filename, 'r', encoding='utf-8') as f:
-                    self.history = json.load(f)
-                print(f"\n📂 Loaded {len(self.history)} previous turns")
-        except Exception as e:
-            print(f"\n❌ Error loading conversation: {e}")
-            self.history = []
+        self._load_existing()
+    
+    def get_session_count(self):
+        """
+        Retourne le nombre de tours de la session actuelle.
+        """
+        return len(self.session_history)
+    
+    def get_total_count(self):
+        """
+        Retourne le nombre total de tous les tours.
+        """
+        return len(self.all_history)
